@@ -1,4 +1,6 @@
 from collections import UserDict
+import re
+from datetime import datetime, date, timedelta
 
 class Field:
     '''
@@ -37,6 +39,7 @@ class Record:
     def __init__(self, name):
         self.name = Name(name)
         self.phones = []
+        self.birthday = None
 
     def add_phone(self, phone: str) -> None:
         '''
@@ -60,6 +63,12 @@ class Record:
         '''
         self.remove_phone(old)
         self.add_phone(new)
+
+    def add_birthday(self, birthday:str) -> None:
+        '''
+        Adds a one's birthday.
+        '''
+        self.birthday = Birthday(birthday)
 
     def __str__(self):
         return f"Contact name: {self.name.value}, phones: {'; '.join(p.value for p in self.phones)}"
@@ -95,12 +104,61 @@ class AddressBook(UserDict):
         if name in self.data.keys:
             self.data.pop(name)
 
+    def get_upcoming_birthdays(self, days=7) -> list:
+        '''The function collects the birthdays for the next
+        seven days, and returns them as a list.
+        '''
+        upcoming_birthdays = []
+        today = date.today()
+        self.days = days
+
+        def find_next_weekday(start_date, weekday):
+            days_ahead = weekday - start_date.weekday()
+            if days_ahead <= 0:
+                days_ahead += 7
+            return start_date + timedelta(days=days_ahead)
+
+        def adjust_for_weekend(birthday):
+            if birthday.weekday() >= 5:
+                return find_next_weekday(birthday, 0)
+            return birthday
+        
+        def date_to_string(date: datetime) -> str:
+            return date.strftime("%Y.%m.%d")
+
+        for user in self.data.keys():
+            birthday_this_year = self[user].birthday.birthday_dt.replace(year=today.year).date()
+            if birthday_this_year < today:
+                birthday_this_year = self[user].birthday.birthday_dt.replace(year=today.year + 1)
+            if 0 <= (birthday_this_year - today).days <= self.days:
+                birthday_this_year = adjust_for_weekend(birthday_this_year)
+                
+                congratulation_date_str = date_to_string(birthday_this_year)
+                upcoming_birthdays.append(f"{self[user].name.value}'s congratulation date is {congratulation_date_str}.")
+        
+        return upcoming_birthdays
+
     def __str__(self):
         dict_to_string = ''
         for rec in self.values():
             dict_to_string += (f"Contact name: {rec.name.value}, phones: {'; '.join(p.value for p in rec.phones)}\n")       
         return dict_to_string.strip()
 
+class Birthday(Field):
+    '''
+    The special class to validate, save and operate birthday dates.
+    '''
+    def __init__(self, value):
+        try:
+            shablon = r'[0-3]\d.[0-1]\d.\d{4}'
+            birthday_str = (re.search(shablon, value)).group(0)
+            birthday_dt = datetime.strptime(birthday_str, '%d.%m.%Y')
+            self.birthday_dt = birthday_dt
+            self.value = birthday_str
+        except ValueError:
+            raise ValueError("Invalid date format. Use DD.MM.YYYY")
+        except AttributeError:
+            raise AttributeError('Invalid date format. Use DD.MM.YYYY')
  
 if __name__ == '__main__':
 
